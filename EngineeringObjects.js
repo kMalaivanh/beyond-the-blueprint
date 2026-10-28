@@ -42,7 +42,7 @@ function makeRig(group){
  for(const z of [-W/2,W/2])line(shell,[[-L/2,-H/2,z],[L/2,-H/2,z],[L/2,H/2,z],[-L/2,H/2,z],[-L/2,-H/2,z]],0x84a6a4,.4);
  for(const x of [-L/2,L/2])for(const y of [-H/2,H/2])line(shell,[[x,y,-W/2],[x,y,W/2]],0x84a6a4,.4);
  for(const x of [-7,-1,7]){line(shell,[[x,-4,-4],[x,4,-4]],0x66817f,.16);line(shell,[[x,-4,4],[x,4,4]],0x66817f,.16)}
- const parts=[[-10,-2.6,-3.45],[-8,2.7,-3.45],[-3,-.5,3.45],[1,3,3.45],[7,-2.5,-3.45],[10,2,3.45],[2,-1,-3.45],[-6,3,3.45],[9,3,-3.45],[-1,-2.8,3.45]];
+ const parts=[[0,-2.6,-3.45],[-8,2.7,-3.45],[-3,-.5,3.45],[1,3,3.45],[7,-2.5,-3.45],[10,2,3.45],[2,-1,-3.45],[-6,3,3.45],[9,3,-3.45],[-1,-2.8,3.45]];
  parts.forEach((p,i)=>{
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(i===0?1.5:.67,i===0?1.9:.67,.52),mat(i===0?0xe8aa7d:0xc7d5cd,.9));
   mesh.position.set(...p);mesh.userData.baseOpacity=.9;rig.add(mesh);
@@ -54,21 +54,22 @@ function makeRig(group){
  const loose=[];
  for(let i=1;i<parts.length;i++){
   const [x,y,z]=parts[i];const wiggle=((i%3)-1)*1.3;
-  const path=[source,[-8.7,-2.6+(i%5)*.46,-3.2],[-5.4+i*.42,-3.8+(i%3)*1.3,-2.7+((i%4)-1.5)*.75],[(x-1.6),-1.5+wiggle,((i%2)===0?2.6:-2.7)],[x,y,z]];
+  const path=[source,[(i%2?-1:1)*(1.6+i*.18),-2.1+(i%5)*.63,-3.1],[(i%2?-1:1)*(3.4+i*.33),-3.6+(i%4)*1.7,-2.7+((i%4)-1.5)*.55],[(x*.75),-1.5+wiggle,((i%2)===0?2.6:-2.7)],[x,y,z]];
   loose.push(cable(manual,path,palette[i%palette.length],.055));
  }
  // AFTER: A single shared backbone from the same distribution panel.
  // Short branches terminate at exactly the same components as the before.
- const trunk=cable(harness,[source,[-8,-2.65,-3.45],[-4,-2.65,-3.45],[0,-2.65,-3.45],[5,-2.65,-3.45],[10,-2.65,-3.45]],0xdcb08b,.26);
+ const trunkLeft=cable(harness,[source,[-2.5,-2.65,-3.45],[-5.5,-2.65,-3.45],[-10,-2.65,-3.45]],0xdcb08b,.26);
+ const trunkRight=cable(harness,[source,[2.5,-2.65,-3.45],[5.5,-2.65,-3.45],[10,-2.65,-3.45]],0xdcb08b,.26);
  const branches=parts.slice(1).map(([x,y,z],i)=>{
   const tap=clamp(x,-8,10);
   const path=[[tap,-2.65,-3.45],[tap,-2.25,-3.4],[tap,y*.65,z*.65],[x,y,z]];
   return cable(harness,path,palette[(i+1)%palette.length],.07)
  });
  const bands=[];
- [-7,-3,1,5,8].forEach(x=>{const m=new THREE.Mesh(new THREE.TorusGeometry(.29,.045,7,12),mat(0xc6d0ca));m.rotation.y=Math.PI/2;m.position.set(x,-2.65,-3.45);harness.add(m);bands.push(m)});
+ [-8,-5,-2,2,5,8].forEach(x=>{const m=new THREE.Mesh(new THREE.TorusGeometry(.29,.045,7,12),mat(0xc6d0ca));m.rotation.y=Math.PI/2;m.position.set(x,-2.65,-3.45);harness.add(m);bands.push(m)});
  rig.rotation.set(.16,-.25,0);
- return {rig,shell,manual,harness,loose,trunk,branches,bands};
+ return {rig,shell,manual,harness,loose,trunks:[trunkLeft,trunkRight],branches,bands};
 }
 export function createEngineeringObjects(scene){
  const drawings=new THREE.Group();scene.add(drawings);
@@ -105,7 +106,7 @@ export function createEngineeringObjects(scene){
   opacity(r.harness,rigAlpha*harnessAlpha);
   // Richer arcs grow outward from center one-by-one: first chaotic, then tidy.
   r.loose.forEach((wire,i)=>wire.set((p-.386-i*.012)/.11));
-  r.trunk.set((p-.56)/.075);
+  r.trunks.forEach((wire,i)=>wire.set((p-.56-i*.01)/.085));
   r.branches.forEach((wire,i)=>wire.set((p-.635-i*.014)/.075));
   r.bands.forEach((band,i)=>{band.scale.setScalar(.3+.7*ease((p-.67-i*.012)/.04))});
   // Centered and nearly full-screen while retaining clearance for camera perspective.
