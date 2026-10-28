@@ -9,13 +9,13 @@ const smooth=x=>{x=clamp(x);return x*x*(3-2*x)};
 const mix=(a,b,t)=>a+(b-a)*t;
 const rand=i=>{let v=Math.sin(i*127.1+78.233)*43758.5453;return v-Math.floor(v)};
 const titles=[
- ['00 / THE BEGINNING','Before anything connected.','Every design was its own universe.'],
- ['01 / FRAGMENTATION','The drawings become visible.','Individual electrical sheets emerge from the particles, revealing duplicated design work.'],
- ['02 / THE THINKING','Observe. Measure. Model.','See the engineering decision process: understand the geometry before changing the workflow.'],
- ['03 / THE ENGINEERING','A drawing becomes a 3D vehicle.','Follow the physical reality: components, spatial constraints, and individual wires routed through a coach.'],
- ['04 / THE TRANSFORMATION','One backbone. Then the branches.','A growing harness replaces separate routes with a reusable architecture. The connections still serve distinct destinations.'],
- ['05 / THE SYSTEM','One foundation. Many possibilities.','Change the configuration. The relationships endure.'],
- ['06 / BEYOND THE BLUEPRINT','Different disciplines. One mindset.','Electrical engineering. Software. Data. Leadership. Always improving.']
+ ['00 / ORIGIN','Disconnected.',''],
+ ['01 / DRAWINGS','One circuit. One drawing.',''],
+ ['02 / DISCOVERY','Understand the space.',''],
+ ['03 / BEFORE','Wire by wire.',''],
+ ['04 / AFTER','One harness. Many branches.',''],
+ ['05 / REUSE','Built to adapt.',''],
+ ['06 / BEYOND','Better systems.','']
 ];
 const shell=document.createElement('div');
 shell.innerHTML=`<div class="film-ui">
@@ -142,10 +142,10 @@ const render=(ms)=>{
  const drift=reduced?0:Math.sin(time*.1)*.12;
  world.rotation.y=mix(world.rotation.y,renderProgress*1.35+mouseX*.12+drift,.035);
  world.rotation.x=mix(world.rotation.x,(renderProgress-.5)*.21+mouseY*.07,.035);
- camera.position.z=mix(camera.position.z,innerWidth<720?46:32-(Math.sin(renderProgress*Math.PI)*3),.025);
+ camera.position.z=mix(camera.position.z,innerWidth<720?37:31-(Math.sin(renderProgress*Math.PI)*2),.025);
  camera.position.x=mix(camera.position.x,Math.sin(renderProgress*TAU)*2,.018);camera.lookAt(0,0,0);
  material.uniforms.uTime.value=time;
- const objectFocus=Math.max(objectState.drawingOpacity*.92,objectState.rigOpacity*.82);
+ const objectFocus=Math.max(objectState.drawingOpacity*.97,objectState.rigOpacity*.96,objectState.measureOpacity*.98);
  material.uniforms.uOpacity.value=1-objectFocus*.88;
  tracer.material.opacity=.75*(1-objectFocus*.83);
  lines.material.opacity*=1-objectFocus*.75;
