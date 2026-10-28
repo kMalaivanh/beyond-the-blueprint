@@ -1,0 +1,685 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Drawings To Harness</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@300;400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<style>
+/* Layout: a tall scroll track drives one fixed stage. Acts swap between an SVG drawing layer
+   and a WebGL trailer; the last act pins a scissor-split comparison. */
+:root{
+  --abyss:#05090D; --paper:#E9E4DA; --ink:#1A2026;
+  --panel:rgba(8,16,21,.85); --line:#1A2730; --line-2:#122029;
+  --bone:#EFEAE4; --mut:#8B9BA3; --dim:#55666F;
+  --cu:#E8823C; --cy:#5FC9D4; --warn:#D9A441;
+  --serif:'Instrument Serif',Georgia,serif;
+  --sans:'Zen Kaku Gothic New','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--abyss); color:var(--bone); font-family:var(--sans); font-weight:300; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+.mono{font-family:var(--mono); font-size:10px; letter-spacing:.19em; text-transform:uppercase; line-height:1.7}
+.dim{color:var(--mut)} .faint{color:var(--dim)}
+
+#bg{position:fixed; inset:0; z-index:0;
+  background:radial-gradient(85% 70% at 64% 32%,rgba(18,58,72,.4) 0%,rgba(5,9,13,0) 64%),
+             radial-gradient(60% 50% at 18% 84%,rgba(42,27,14,.3) 0%,rgba(5,9,13,0) 60%),
+             linear-gradient(180deg,#071118 0%,#05090D 62%,#04080B 100%)}
+#stage{position:fixed; inset:0; z-index:2; opacity:0; transition:opacity .7s ease}
+#stage canvas{display:block; width:100%; height:100%}
+#sheets{position:fixed; inset:0; z-index:3; pointer-events:none; perspective:1400px}
+
+/* drawing sheets */
+.sheet{position:absolute; top:50%; left:50%; width:min(300px,42vw); aspect-ratio:4/3; background:var(--paper);
+  border:1px solid #BDB5A6; box-shadow:0 18px 44px rgba(0,0,0,.55); transform-origin:50% 50%; will-change:transform,opacity}
+.sheet svg{width:100%; height:100%; display:block}
+.sheet .tb{position:absolute; left:0; right:0; bottom:0; height:17%; border-top:1px solid #BDB5A6; display:flex; align-items:center; justify-content:space-between; padding:0 7px; font-family:var(--mono); font-size:6px; letter-spacing:.1em; color:#55605C; text-transform:uppercase}
+
+/* caption rail */
+.cap{position:fixed; z-index:6; left:max(22px,env(safe-area-inset-left,0px)); bottom:calc(30px + env(safe-area-inset-bottom,0px)); max-width:min(520px,76vw); opacity:0; transition:opacity .5s ease; pointer-events:none}
+.cap.on{opacity:1}
+.cap .k{display:flex; align-items:center; gap:12px; color:var(--cu)}
+.cap .k .tick{width:34px; height:1px; background:var(--cu)}
+.cap h2{margin:12px 0 0; font-family:var(--serif); font-weight:400; font-size:clamp(28px,5vw,62px); line-height:.98; letter-spacing:-.02em}
+.cap h2 em{font-style:italic; color:var(--cu)}
+.cap p{margin-top:14px; color:var(--mut); font-size:clamp(14px,1.15vw,17px); line-height:1.6; max-width:46ch}
+
+/* metric readout */
+.metrics{position:fixed; z-index:6; right:max(22px,env(safe-area-inset-right,0px)); bottom:calc(30px + env(safe-area-inset-bottom,0px));
+  background:var(--panel); border:1px solid var(--line); backdrop-filter:blur(9px); min-width:210px; opacity:0; transition:opacity .5s ease; pointer-events:none}
+.metrics.on{opacity:1}
+.metrics .row{display:flex; justify-content:space-between; gap:16px; padding:10px 15px; border-bottom:1px solid var(--line-2); font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim)}
+.metrics .row:last-child{border-bottom:0}
+.metrics .row b{color:var(--bone); font-weight:400; font-variant-numeric:tabular-nums}
+.metrics .row.hi b{color:var(--cu)}
+
+/* top bar */
+.top{position:fixed; z-index:7; top:0; left:0; right:0; padding-top:env(safe-area-inset-top,0px)}
+.top .in{display:flex; justify-content:space-between; align-items:flex-start; gap:18px;
+  padding:20px max(22px,env(safe-area-inset-right,0px)) 20px max(22px,env(safe-area-inset-left,0px))}
+.top .nm{font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase}
+.top .nm span{color:var(--dim)}
+.prog{position:fixed; z-index:7; top:0; left:0; height:2px; background:var(--cu); width:0}
+
+/* act ticks */
+.acts{position:fixed; z-index:6; right:max(22px,env(safe-area-inset-right,0px)); top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:12px}
+.acts i{display:block; width:22px; height:1px; background:var(--line); transition:background .4s,width .4s}
+.acts i.on{background:var(--cu); width:34px}
+
+/* compare */
+.compare{position:fixed; z-index:5; inset:0; opacity:0; transition:opacity .5s; pointer-events:none}
+.compare.on{opacity:1; pointer-events:auto}
+.handle{position:absolute; top:0; bottom:0; width:2px; background:var(--bone); left:50%; cursor:ew-resize; touch-action:none}
+.handle::before{content:''; position:absolute; left:-26px; right:-26px; top:0; bottom:0}
+.knob{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:46px; height:46px; border-radius:50%; background:var(--bone); color:var(--abyss); display:grid; place-items:center; font-family:var(--mono); font-size:13px; letter-spacing:.06em; box-shadow:0 6px 22px rgba(0,0,0,.5)}
+.cmpL,.cmpR{position:absolute; top:calc(96px + env(safe-area-inset-top,0px)); font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase}
+.cmpL{left:max(22px,env(safe-area-inset-left,0px)); color:var(--warn)}
+.cmpR{right:max(22px,env(safe-area-inset-right,0px)); color:var(--cy); text-align:right}
+
+/* disclosure */
+.disc{position:fixed; z-index:7; left:max(22px,env(safe-area-inset-left,0px)); top:calc(62px + env(safe-area-inset-top,0px)); color:var(--dim); font-family:var(--mono); font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; line-height:1.8; max-width:40ch; pointer-events:none}
+
+.track{position:relative; z-index:1}
+.scrollcue{position:fixed; z-index:6; left:50%; transform:translateX(-50%); bottom:calc(26px + env(safe-area-inset-bottom,0px)); color:var(--dim); font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; transition:opacity .5s}
+.end{position:relative; z-index:8; background:var(--abyss); padding-block:clamp(70px,12vh,140px);
+  padding-left:max(22px,env(safe-area-inset-left,0px)); padding-right:max(22px,env(safe-area-inset-right,0px))}
+.end .in{max-width:1320px; margin-inline:auto}
+.end h3{margin:0; font-family:var(--serif); font-weight:400; font-size:clamp(30px,5.4vw,70px); line-height:.98; letter-spacing:-.02em}
+.end p{margin-top:20px; color:var(--mut); max-width:58ch; font-size:clamp(15px,1.2vw,18px); line-height:1.65}
+.end .back{display:inline-block; margin-top:28px; font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--cu); text-decoration:none; border-bottom:1px solid currentColor; padding-bottom:4px}
+.fallback{position:fixed; inset:0; z-index:20; display:none; place-items:center; padding:28px; text-align:center; background:var(--abyss)}
+html.nogl .fallback{display:grid}
+
+@media (max-width:860px){
+  .metrics{min-width:0; left:max(22px,env(safe-area-inset-left,0px)); right:auto; bottom:auto; top:calc(120px + env(safe-area-inset-top,0px))}
+  .cap{bottom:calc(26px + env(safe-area-inset-bottom,0px)); max-width:84vw}
+  .acts{display:none}
+  .disc{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+</style>
+
+<div id="bg"></div>
+<div id="stage"></div>
+<div id="sheets"></div>
+
+<div class="prog" id="prog"></div>
+<div class="top"><div class="in">
+  <div class="nm">Drawings to harness<br><span>Kailia Malaivanh · Industrial Engineering</span></div>
+  <div class="nm faint" id="actLabel">Act 01 / 05</div>
+</div></div>
+<div class="disc">Illustrative reconstruction. Generic trailer geometry,<br>fictional circuits, components and lengths.<br>Not manufacturer CAD data.</div>
+
+<div class="acts" id="acts"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+
+<div class="cap" id="cap">
+  <div class="k mono"><span class="tick"></span><span id="capK">Act 01 — the old workflow</span></div>
+  <h2 id="capH">One drawing<br>per <em>circuit</em>.</h2>
+  <p id="capP">Every circuit was drawn flat, on its own sheet, in 2D. Three models meant drawing the same change three times.</p>
+</div>
+
+<div class="metrics" id="metrics"></div>
+
+<div class="compare" id="compare">
+  <div class="cmpL">Before · wire by wire</div>
+  <div class="cmpR">After · one harness</div>
+  <div class="handle" id="handle"><div class="knob">↔</div></div>
+</div>
+
+<div class="scrollcue" id="scrollcue">Scroll</div>
+
+<div class="track" id="track"></div>
+
+<div class="end">
+  <div class="in">
+    <h3>What actually<br>changed.</h3>
+    <p>Routing a harness in 3D instead of drawing each circuit flat means the wire can be seen going down a wall, around a corner, and holding a minimum bend radius — things a flat drawing cannot represent. Lengths come off the model instead of being worked out by hand, and a change to one model updates the route rather than starting a new sheet.</p>
+    <p>The manufacturing half of this study is a demonstration of how harness-based installation compares with individual wire pulls. Figures shown are illustrative, drawn from this reconstructed model rather than production data.</p>
+    <a class="back" href="#" id="backLink">Back to the top ↑</a>
+  </div>
+</div>
+
+<div class="fallback">
+  <div>
+    <div class="mono dim" style="margin-bottom:12px">WebGL unavailable</div>
+    <div style="font-family:var(--serif); font-size:26px; line-height:1.15">This case study needs WebGL.</div>
+    <div class="mono faint" style="margin-top:14px">Try a desktop browser with hardware acceleration on.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var root=document.documentElement;
+var reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+if(typeof THREE==="undefined"){root.classList.add("nogl");return;}
+
+/* ============================ act map ============================ */
+var ACTS=[
+ {a:0.00,b:0.17,k:"Act 01 — the old workflow",h:"One drawing<br>per <em>circuit</em>.",
+  p:"Every circuit was drawn flat, on its own sheet, in 2D. Three models meant drawing the same change three times."},
+ {a:0.17,b:0.30,k:"Act 02 — into three dimensions",h:"The same wire,<br>in <em>space</em>.",
+  p:"Routed in 3D, the wire goes down a wall, turns a corner, and holds a bend radius. A flat sheet cannot show any of that."},
+ {a:0.30,b:0.47,k:"Act 03 — one route, many models",h:"Stretch the<br>coach, keep the <em>route</em>.",
+  p:"The routing is reusable. Change the model and the path adapts, and every wire length is recalculated off the geometry instead of by hand."},
+ {a:0.47,b:0.70,k:"Act 04 — the old build",h:"Wire by<br><em>wire</em>.",
+  p:"On the floor, each circuit is its own pull: find it, route it, dress it, terminate it. Every wire is handled on its own."},
+ {a:0.70,b:0.90,k:"Act 05 — the harness build",h:"One bundle,<br>then <em>branches</em>.",
+  p:"A preassembled harness drops into the shared corridor, gets clipped down, and the branches plug in. The handling happens once, upstream."},
+ {a:0.90,b:1.01,k:"Compare",h:"Drag to<br><em>compare</em>.",
+  p:"Same coach, same circuits, both finished. Left was built wire by wire; right came in as one harness."}
+];
+
+/* ============================ scroll track ============================ */
+var track=document.getElementById("track");
+track.style.height=(reduce?140:660)+"vh";
+
+/* ============================ act 1 : drawing sheets ============================ */
+var sheetWrap=document.getElementById("sheets"),SHEETS=[];
+(function(){
+  var NAMES=["TAIL LAMP","MARKER LH","MARKER RH","FRIDGE","FURNACE","WATER HTR","SLIDE MTR",
+             "GFCI GALLEY","CEILING FWD","CEILING AFT","ROOF A/C","VENT FAN","ANTENNA","SOLAR IN",
+             "JACK FRONT","JACK REAR","BREAKAWAY","7-WAY","PLATE LAMP","STORAGE LAMP","OUTLET AFT","SWITCH PNL"];
+  for(var i=0;i<22;i++){
+    var d=document.createElement("div");d.className="sheet";
+    var seed=i*7919;
+    function rnd(n){seed=(seed*1103515245+12345)&0x7fffffff;return (seed%1000)/1000*n;}
+    var path="",y=30+rnd(20);
+    path+="M14 "+y.toFixed(0)+" H"+(40+rnd(30)).toFixed(0);
+    var cx=40+rnd(30),cy=y;
+    for(var s=0;s<4+Math.floor(rnd(3));s++){
+      var ny=cy+(rnd(2)>1?1:-1)*(12+rnd(22)),nx=cx+(16+rnd(34));
+      path+=" V"+ny.toFixed(0)+" H"+nx.toFixed(0);
+      cy=ny;cx=nx;
+    }
+    var stubs="";
+    for(var t=0;t<3+Math.floor(rnd(3));t++){
+      var sx=30+rnd(150),sy=24+rnd(70);
+      stubs+='<path d="M'+sx.toFixed(0)+' '+sy.toFixed(0)+' l'+(10+rnd(16)).toFixed(0)+' '+((rnd(2)>1?1:-1)*(8+rnd(14))).toFixed(0)+'" stroke="#6C7A74" stroke-width="1" fill="none"/>';
+      stubs+='<rect x="'+(sx+16).toFixed(0)+'" y="'+(sy-4).toFixed(0)+'" width="9" height="7" fill="none" stroke="#6C7A74" stroke-width="1"/>';
+    }
+    d.innerHTML='<svg viewBox="0 0 220 165" aria-hidden="true">'+
+      '<rect x="6" y="6" width="208" height="153" fill="none" stroke="#C3BBAC" stroke-width="1"/>'+
+      '<path d="'+path+'" stroke="#2C3A38" stroke-width="1.4" fill="none"/>'+stubs+
+      '<text x="14" y="18" font-family="monospace" font-size="7" fill="#7A857F" letter-spacing="1">'+NAMES[i%NAMES.length]+'</text>'+
+      '</svg><div class="tb"><span>'+NAMES[i%NAMES.length]+'</span><span>SHT '+(i+1)+' / 52</span></div>';
+    sheetWrap.appendChild(d);
+    SHEETS.push({el:d,
+      x:(rnd(1)-0.5)*1.25, y:(rnd(1)-0.5)*1.0,
+      r:(rnd(1)-0.5)*34, s:0.72+rnd(1)*0.4, t:i/22});
+  }
+})();
+
+/* ============================ three ============================ */
+var host=document.getElementById("stage"),renderer;
+try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch(e){root.classList.add("nogl");return;}
+if(!renderer||!renderer.getContext()){root.classList.add("nogl");return;}
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.08;
+host.appendChild(renderer.domElement);
+
+var scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x05090D,30,70);
+var camera=new THREE.PerspectiveCamera(36,innerWidth/innerHeight,.1,220);
+var V=THREE.Vector3;
+
+(function(){
+  var c=document.createElement("canvas");c.width=512;c.height=256;
+  var g=c.getContext("2d"),grd=g.createLinearGradient(0,0,0,256);
+  grd.addColorStop(0,"#2C3B47");grd.addColorStop(.45,"#121C24");grd.addColorStop(1,"#05080B");
+  g.fillStyle=grd;g.fillRect(0,0,512,256);
+  var h=g.createRadialGradient(140,64,4,140,64,150);
+  h.addColorStop(0,"rgba(232,138,70,.7)");h.addColorStop(1,"rgba(232,138,70,0)");
+  g.fillStyle=h;g.fillRect(0,0,512,256);
+  var t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;
+  try{var pm=new THREE.PMREMGenerator(renderer);pm.compileEquirectangularShader();
+      scene.environment=pm.fromEquirectangular(t).texture;t.dispose();pm.dispose();}
+  catch(e){scene.environment=t;}
+})();
+var kL=new THREE.DirectionalLight(0xffe2c0,1.45);kL.position.set(8,12,9);scene.add(kL);
+var rL=new THREE.DirectionalLight(0x9cc4ff,.95);rL.position.set(-9,5,-8);scene.add(rL);
+scene.add(new THREE.AmbientLight(0x54616D,.58));
+
+var world=new THREE.Group();scene.add(world);
+var gShell=new THREE.Group(),gRoute=new THREE.Group(),gLoose=new THREE.Group(),gHarness=new THREE.Group();
+world.add(gShell);world.add(gRoute);world.add(gLoose);world.add(gHarness);
+gLoose.visible=false;gHarness.visible=false;
+
+var glowTex=(function(){
+  var c=document.createElement("canvas");c.width=c.height=64;
+  var g=c.getContext("2d"),r=g.createRadialGradient(32,32,0,32,32,32);
+  r.addColorStop(0,"rgba(255,255,255,1)");r.addColorStop(.3,"rgba(255,255,255,.55)");
+  r.addColorStop(1,"rgba(255,255,255,0)");g.fillStyle=r;g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+})();
+function glow(col,sz){
+  var s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:col,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));
+  s.scale.setScalar(sz);return s;
+}
+
+/* ---- parametric coach: ux is a fraction of body length ---- */
+var LA=11.0,LB=14.2,morphL=0;
+var shellParts=[];
+function addShell(def){
+  var g=new THREE.BoxGeometry(1,def.h,def.d);
+  var m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9FB4BE,transparent:true,opacity:.075,roughness:.35,metalness:.04,side:THREE.DoubleSide,depthWrite:false}));
+  var e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x7FA0AE,transparent:true,opacity:.36}));
+  gShell.add(m);gShell.add(e);
+  shellParts.push({m:m,e:e,def:def});
+}
+/* def: ux centre, uw width as fraction, h, d, y, z */
+[
+ {ux:0,uw:1.0,h:.12,d:2.9,y:1.0,z:0},
+ {ux:0,uw:1.0,h:.1,d:2.9,y:3.46,z:0},
+ {ux:0,uw:1.0,h:2.5,d:.1,y:2.25,z:-1.47},
+ {ux:0,uw:1.0,h:2.5,d:.1,y:2.25,z:1.47},
+ {ux:.5,uw:.012,h:2.5,d:2.9,y:2.25,z:0},
+ {ux:-.5,uw:.012,h:2.5,d:2.9,y:2.25,z:0},
+ {ux:-.21,uw:.008,h:2.4,d:2.0,y:2.2,z:.42},
+ {ux:.19,uw:.008,h:2.4,d:1.3,y:2.2,z:-.78}
+].forEach(addShell);
+var rails=[],cross=[],wheels=[];
+[-1.35,1.35].forEach(function(z){
+  var m=new THREE.Mesh(new THREE.BoxGeometry(1,.17,.2),new THREE.MeshStandardMaterial({color:0x4A5A64,roughness:.5,metalness:.65}));
+  m.position.set(0,.86,z);gShell.add(m);rails.push(m);
+});
+for(var ci=0;ci<10;ci++){
+  var m2=new THREE.Mesh(new THREE.BoxGeometry(.1,.12,2.75),new THREE.MeshStandardMaterial({color:0x415058,roughness:.55,metalness:.6}));
+  m2.position.y=.86;gShell.add(m2);cross.push({m:m2,ux:-.45+ci*.1});
+}
+[-.16,-.02].forEach(function(ux){
+  [-1.5,1.5].forEach(function(z){
+    var w=new THREE.Mesh(new THREE.CylinderGeometry(.62,.62,.32,24),new THREE.MeshStandardMaterial({color:0x14181C,roughness:.85,metalness:.1}));
+    w.rotation.x=Math.PI/2;w.position.set(0,.52,z);gShell.add(w);
+    var hb=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.34,18),new THREE.MeshStandardMaterial({color:0x8E9AA2,roughness:.4,metalness:.7}));
+    hb.rotation.x=Math.PI/2;hb.position.set(0,.52,z);gShell.add(hb);
+    wheels.push({a:w,b:hb,ux:ux,z:z});
+  });
+});
+function layoutShell(L){
+  shellParts.forEach(function(p){
+    p.m.scale.x=Math.max(.02,p.def.uw*L);p.m.position.set(p.def.ux*L,p.def.y,p.def.z);
+    p.e.scale.x=p.m.scale.x;p.e.position.copy(p.m.position);
+  });
+  rails.forEach(function(m){m.scale.x=L*1.04;m.position.x=-.02*L;});
+  cross.forEach(function(c){c.m.position.x=c.ux*L;});
+  wheels.forEach(function(w){w.a.position.x=w.b.position.x=w.ux*L;});
+}
+
+/* ---- the routes ---- */
+var WIRE=[0xD2413A,0x1F262B,0xE4DDD0,0x4E9A5B,0x3C6FB4,0xD9B13C,0x8A5A32,0xE08133,0x8257A6,0x9AA3A9,0xD98BA6,0xC9B48A,0x7FC6DA,0x9ECB8E];
+var SRC=[-.11,1.5,-1.3];
+var DEFS=[
+ {id:"railF",main:true,label:"Chassis main, forward",pts:[SRC,[-.11,1.0,-1.3],[-.11,.93,-1.18],[-.44,.93,-1.18],[-.52,.93,-.4]]},
+ {id:"railR",main:true,label:"Chassis main, rear",   pts:[SRC,[-.11,1.0,-1.3],[-.11,.93,-1.18],[.44,.93,-1.18],[.5,.93,-.3]]},
+ {id:"riser",main:true,label:"Wall riser and roof",  pts:[SRC,[-.11,2.2,-1.38],[-.11,3.3,-1.38],[-.11,3.3,0],[.33,3.3,0]]},
+ {id:"tail", label:"Tail lamp",        pts:[[.44,.93,-1.18],[.5,1.3,-1.1],[.52,2.1,-1.3]]},
+ {id:"mark", label:"Marker lamp",      pts:[[-.44,.93,-1.18],[-.48,1.5,-1.3],[-.5,2.45,-1.4]]},
+ {id:"jack", label:"Tongue jack",      pts:[[-.52,.93,-.4],[-.57,.5,-.1],[-.6,.4,0]]},
+ {id:"batt", label:"Battery feed",     pts:[[-.52,.93,-.4],[-.58,1.1,.3],[-.61,1.35,.5]]},
+ {id:"frdg", label:"Refrigerator",     pts:[[.0,.93,-1.18],[.02,1.2,-1.3],[.02,1.95,-1.4]]},
+ {id:"furn", label:"Furnace",          pts:[[.12,.93,-1.18],[.13,1.15,-1.3],[.13,1.5,-1.4]]},
+ {id:"slide",label:"Slide-out motor",  pts:[[.21,.93,-1.18],[.22,1.1,1.0],[.22,1.45,1.5]]},
+ {id:"whtr", label:"Water heater",     pts:[[.3,.93,-1.18],[.31,1.2,1.0],[.31,1.52,1.4]]},
+ {id:"galley",label:"Galley outlet",   pts:[[-.23,.93,-1.18],[-.24,1.25,-1.3],[-.24,1.55,-1.4]]},
+ {id:"ac",   label:"Roof air conditioner",pts:[[.08,3.3,0],[.08,3.5,0],[.08,3.66,0]]},
+ {id:"vent", label:"Roof vent",        pts:[[-.25,3.3,0],[-.25,3.5,0],[-.25,3.64,0]]},
+ {id:"ceil", label:"Ceiling lamp",     pts:[[.18,3.3,0],[.18,3.22,.7],[.18,3.18,.9]]},
+ {id:"solar",label:"Solar input",      pts:[[.33,3.3,0],[.34,3.4,.5],[.34,3.62,.7]]}
+];
+/* a circuit added live in act 3 */
+var ADDED={id:"newc",label:"Added circuit — awning light",pts:[[-.33,.93,-1.18],[-.36,1.6,1.1],[-.38,2.3,1.42]]};
+
+function roundPath(pts,r){
+  if(pts.length<3)return pts.map(function(p){return p.clone();});
+  var out=[pts[0].clone()];
+  for(var i=1;i<pts.length-1;i++){
+    var a=pts[i-1],b=pts[i],c=pts[i+1];
+    var d1=b.clone().sub(a),d2=c.clone().sub(b),l1=d1.length(),l2=d2.length();
+    if(l1<1e-5||l2<1e-5){out.push(b.clone());continue;}
+    var rr=Math.min(r,l1*.42,l2*.42);
+    out.push(b.clone().add(d1.clone().normalize().multiplyScalar(-rr)));
+    out.push(b.clone());
+    out.push(b.clone().add(d2.clone().normalize().multiplyScalar(rr)));
+  }
+  out.push(pts[pts.length-1].clone());return out;
+}
+function curveAt(def,L,fillet){
+  var pts=def.pts.map(function(p){return new V(p[0]*L,p[1],p[2]);});
+  var uniq=[pts[0]];
+  for(var i=1;i<pts.length;i++) if(pts[i].distanceTo(uniq[uniq.length-1])>1e-4) uniq.push(pts[i]);
+  var c=new THREE.CatmullRomCurve3(roundPath(uniq,fillet),false,"catmullrom",.3);
+  c.getLengths(200);return c;
+}
+
+var ROUTES=[];
+DEFS.concat([ADDED]).forEach(function(def,i){
+  var segs=def.main?90:54,rad=def.main?.05:.026;
+  var cA=curveAt(def,LA,.24),cB=curveAt(def,LB,.24);
+  var gA=new THREE.TubeGeometry(cA,segs,rad,7,false);
+  var gB=new THREE.TubeGeometry(cB,segs,rad,7,false);
+  var posB=gB.attributes.position.array.slice();
+  var posA=gA.attributes.position.array.slice();
+  gB.dispose();
+  var col=def.main?0xE8823C:WIRE[i%WIRE.length];
+  var mat=new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.32,roughness:.42,metalness:.12,transparent:true,opacity:1});
+  var mesh=new THREE.Mesh(gA,mat);
+  gA.setDrawRange(0,0);
+  gRoute.add(mesh);
+  var rec={def:def,mesh:mesh,geo:gA,posA:posA,posB:posB,idx:gA.index?gA.index.count:0,
+           lenA:cA.getLength(),lenB:cB.getLength(),curveA:cA,curveB:cB,main:!!def.main,
+           tip:glow(col,def.main?1.5:1.0),added:def===ADDED,col:col};
+  gRoute.add(rec.tip);
+  ROUTES.push(rec);
+});
+function morphRoutes(m){
+  ROUTES.forEach(function(r){
+    var arr=r.geo.attributes.position.array;
+    for(var i=0;i<arr.length;i++) arr[i]=r.posA[i]+(r.posB[i]-r.posA[i])*m;
+    r.geo.attributes.position.needsUpdate=true;
+  });
+}
+function totalLen(m){
+  var t=0;ROUTES.forEach(function(r){ if(!r.added||addedIn>.5) t+=r.lenA+(r.lenB-r.lenA)*m; });
+  return t;
+}
+var addedIn=0;
+
+/* ---- act 4: loose wires, one at a time ---- */
+var LOOSE=[];
+DEFS.filter(function(d){return !d.main;}).forEach(function(def,i){
+  var end=def.pts[def.pts.length-1];
+  var yMid=1.08+(i%5)*.06,zLane=-1.2+(i%8)*.3;
+  var raw=[new V(SRC[0]*LA,SRC[1],SRC[2]),
+           new V(SRC[0]*LA,yMid,SRC[2]),
+           new V(SRC[0]*LA,yMid,zLane),
+           new V(end[0]*LA,yMid,zLane),
+           new V(end[0]*LA,yMid,end[2]),
+           new V(end[0]*LA,end[1],end[2])];
+  var c=new THREE.CatmullRomCurve3(roundPath(raw,.04),false,"catmullrom",.3);
+  c.getLengths(160);
+  var col=WIRE[i%WIRE.length];
+  var g=new THREE.TubeGeometry(c,60,.023,6,false);g.setDrawRange(0,0);
+  var m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.3,roughness:.45,metalness:.1,transparent:true,opacity:1}));
+  gLoose.add(m);
+  var tp=glow(col,1.0);gLoose.add(tp);
+  LOOSE.push({mesh:m,geo:g,idx:g.index?g.index.count:0,curve:c,tip:tp,order:i,len:c.getLength()});
+});
+
+/* ---- act 5: the preassembled harness, installed as one piece ---- */
+var hTrunk=[],hBranch=[];
+DEFS.forEach(function(def,i){
+  var c=curveAt(def,LA,.24);
+  var segs=def.main?90:54,rad=def.main?.072:.026;
+  var g=new THREE.TubeGeometry(c,segs,rad,def.main?10:6,false);
+  var col=def.main?0xBFCBD2:WIRE[i%WIRE.length];
+  var mat=def.main
+    ? new THREE.MeshPhysicalMaterial({color:col,transparent:true,opacity:.42,roughness:.3,metalness:0,side:THREE.DoubleSide,depthWrite:false,clearcoat:.5})
+    : new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.3,roughness:.42,metalness:.12,transparent:true,opacity:1});
+  var m=new THREE.Mesh(g,mat);
+  gHarness.add(m);
+  var rec={mesh:m,geo:g,idx:g.index?g.index.count:0,curve:c,main:!!def.main,col:col};
+  if(def.main){hTrunk.push(rec);}else{
+    rec.tip=glow(col,1.0);gHarness.add(rec.tip);
+    rec.conn=glow(col,1.5);rec.conn.position.copy(c.getPointAt(1));gHarness.add(rec.conn);
+    hBranch.push(rec);
+  }
+});
+/* clips that snap the trunk down */
+var clips=[];
+[-.4,-.2,0,.2,.4].forEach(function(ux){
+  var m=new THREE.Mesh(new THREE.TorusGeometry(.12,.022,8,16),
+    new THREE.MeshStandardMaterial({color:0x8E9AA2,roughness:.4,metalness:.7,transparent:true,opacity:0}));
+  m.rotation.y=Math.PI/2;m.position.set(ux*LA,.93,-1.18);gHarness.add(m);clips.push(m);
+});
+
+/* panel */
+var pdc=new THREE.Mesh(new THREE.BoxGeometry(.56,.72,.2),
+  new THREE.MeshStandardMaterial({color:0x1A232B,roughness:.42,metalness:.25,emissive:0xE8823C,emissiveIntensity:0}));
+var pdcGlow=glow(0xE8823C,2.3);
+var pdcG=new THREE.Group();pdcG.add(pdc);pdcG.add(pdcGlow);world.add(pdcG);
+
+/* ============================ camera ============================ */
+var sph={th:Math.PI*.22,ph:Math.PI*.38,r:24},tgt=new V(0,2,0);
+function applyCam(){
+  camera.position.set(
+    tgt.x+sph.r*Math.sin(sph.ph)*Math.sin(sph.th),
+    tgt.y+sph.r*Math.cos(sph.ph),
+    tgt.z+sph.r*Math.sin(sph.ph)*Math.cos(sph.th));
+  camera.lookAt(tgt);
+}
+var CAMK=[
+ {t:.17,th:Math.PI*.0,  ph:Math.PI*.5, r:19, ty:2.0},
+ {t:.26,th:Math.PI*.17, ph:Math.PI*.40,r:17, ty:2.0},
+ {t:.33,th:Math.PI*.30, ph:Math.PI*.36,r:20, ty:2.1},
+ {t:.47,th:Math.PI*.12, ph:Math.PI*.33,r:25, ty:2.1},
+ {t:.60,th:Math.PI*.42, ph:Math.PI*.42,r:17, ty:1.9},
+ {t:.70,th:Math.PI*.30, ph:Math.PI*.40,r:21, ty:2.0},
+ {t:.82,th:Math.PI*.46, ph:Math.PI*.40,r:18, ty:1.9},
+ {t:.90,th:Math.PI*.22, ph:Math.PI*.36,r:24, ty:2.1},
+ {t:1.02,th:Math.PI*.22,ph:Math.PI*.36,r:24, ty:2.1}
+];
+function camFor(p){
+  var i=0;while(i<CAMK.length-2&&CAMK[i+1].t<p)i++;
+  var a=CAMK[i],b=CAMK[i+1];
+  var k=Math.max(0,Math.min(1,(p-a.t)/Math.max(1e-4,b.t-a.t)));k=k*k*(3-2*k);
+  return {th:a.th+(b.th-a.th)*k,ph:a.ph+(b.ph-a.ph)*k,r:a.r+(b.r-a.r)*k,ty:a.ty+(b.ty-a.ty)*k};
+}
+
+/* ============================ dom refs ============================ */
+var stage=document.getElementById("stage"),capEl=document.getElementById("cap"),
+    capK=document.getElementById("capK"),capH=document.getElementById("capH"),capP=document.getElementById("capP"),
+    metrics=document.getElementById("metrics"),prog=document.getElementById("prog"),
+    actLabel=document.getElementById("actLabel"),actTicks=document.getElementById("acts").children,
+    compare=document.getElementById("compare"),handle=document.getElementById("handle"),
+    scrollcue=document.getElementById("scrollcue");
+var curAct=-1;
+function setAct(i,p){
+  if(i===curAct)return;curAct=i;
+  var A=ACTS[i];
+  capK.textContent=A.k;capH.innerHTML=A.h;capP.textContent=A.p;
+  actLabel.textContent=i<5?("Act 0"+(i+1)+" / 05"):"Compare";
+  for(var k=0;k<actTicks.length;k++)actTicks[k].classList.toggle("on",k===Math.min(4,i));
+}
+function setMetrics(rows){
+  var h="";rows.forEach(function(r){h+='<div class="row'+(r[2]?" hi":"")+'">'+r[0]+"<b>"+r[1]+"</b></div>";});
+  metrics.innerHTML=h;
+}
+function inches(u){return Math.round(u*36).toLocaleString();}
+
+/* compare slider */
+var split=.5,dragging=false;
+function setSplit(x){
+  split=Math.max(.06,Math.min(.94,x));
+  handle.style.left=(split*100)+"%";
+}
+handle.addEventListener("pointerdown",function(e){dragging=true;handle.setPointerCapture&&handle.setPointerCapture(e.pointerId);e.preventDefault();});
+addEventListener("pointermove",function(e){if(dragging)setSplit(e.clientX/innerWidth);});
+addEventListener("pointerup",function(){dragging=false;});
+setSplit(.5);
+
+document.getElementById("backLink").addEventListener("click",function(e){
+  e.preventDefault();scrollTo({top:0,behavior:reduce?"auto":"smooth"});
+});
+
+addEventListener("resize",function(){
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+},{passive:true});
+
+/* ============================ loop ============================ */
+function ease(x){return x<0?0:x>1?1:x*x*(3-2*x);}
+function span(p,a,b){return Math.max(0,Math.min(1,(p-a)/(b-a)));}
+
+function frame(){
+  requestAnimationFrame(frame);
+  var max=Math.max(1,track.offsetHeight-innerHeight);
+  var p=Math.max(0,Math.min(1,(window.scrollY||0)/max));
+  prog.style.width=(p*100)+"%";
+  if(scrollcue)scrollcue.style.opacity=p>.02?0:1;
+
+  var ai=0;for(var i=0;i<ACTS.length;i++) if(p>=ACTS[i].a) ai=i;
+  setAct(ai,p);
+  capEl.classList.add("on");
+
+  /* ---- act 1 sheets ---- */
+  var s1=span(p,0,.14),fold=span(p,.13,.19);
+  sheetWrap.style.opacity=(1-fold).toFixed(3);
+  SHEETS.forEach(function(sh,i){
+    var app=Math.max(0,Math.min(1,(s1-sh.t*.86)/.14));
+    var e=ease(app);
+    var x=sh.x*innerWidth*.34*e, y=sh.y*innerHeight*.3*e;
+    var r=sh.r*e, sc=(0.5+0.5*e)*sh.s;
+    x*=(1-fold);y*=(1-fold);r*=(1-fold);
+    sc*=(1-fold*.75);
+    sh.el.style.opacity=(e*(1-fold)).toFixed(3);
+    sh.el.style.transform="translate(-50%,-50%) translate("+x.toFixed(1)+"px,"+y.toFixed(1)+"px) rotate("+r.toFixed(2)+"deg) scale("+sc.toFixed(3)+")";
+  });
+  if(p<.145){
+    var n=Math.round(1+s1*51);
+    setMetrics([["Drawings",n+" / 52"],["Models","3"],["Each change","drawn 3×",true],["Dimension","2D, flat"]]);
+    metrics.classList.add("on");
+  }
+
+  /* ---- 3D visibility ---- */
+  stage.style.opacity=p>.14?1:0;
+
+  /* ---- act 2/3: routed harness, model morph, added circuit ---- */
+  var grow=span(p,.18,.30);
+  morphL=ease(span(p,.33,.44));
+  addedIn=span(p,.44,.47);
+  var L=LA+(LB-LA)*morphL;
+  layoutShell(L);
+  pdcG.position.set(SRC[0]*L,1.62,-1.3);
+  var wake=span(p,.16,.2);
+  pdc.material.emissiveIntensity=wake*1.5;pdcGlow.material.opacity=wake*.8;
+  if(p<.52)morphRoutes(morphL);
+
+  var routeOn=p>=.145&&p<.50;
+  gRoute.visible=routeOn;
+  if(routeOn){
+    ROUTES.forEach(function(r,idx){
+      var local=r.added?addedIn:Math.max(0,Math.min(1,(grow-(r.main?0:.18)-idx*.018)/.6));
+      var e=ease(local);
+      if(r.idx)r.geo.setDrawRange(0,Math.floor(r.idx*e));
+      r.mesh.visible=e>.002;
+      r.mesh.material.opacity=r.added?(.25+addedIn*.75):1;
+      var tipOn=e>.01&&e<.99;
+      r.tip.visible=tipOn;
+      if(tipOn){
+        var cv=morphL>.5?r.curveB:r.curveA;
+        r.tip.position.copy(cv.getPointAt(e));r.tip.material.opacity=.9;
+      }
+    });
+    if(p>=.145&&p<.33){
+      setMetrics([["Routing","3D"],["Bend radius","held",true],["Circuits",DEFS.length],["Length source","model"]]);
+    }else if(p<.50){
+      setMetrics([["Model",morphL<.5?"A":"B",true],["Body length",(L*3).toFixed(1)+" ft"],
+                  ["Conductor",inches(totalLen(morphL))+" in"],
+                  ["Circuits",DEFS.length+(addedIn>.5?1:0)],
+                  ["Re-drawn","0 sheets",true]]);
+    }
+    metrics.classList.add("on");
+  }
+
+  /* ---- act 4: loose install ---- */
+  var looseP=span(p,.50,.70);
+  gLoose.visible=p>=.48&&p<.92;
+  if(gLoose.visible){
+    var done=0;
+    LOOSE.forEach(function(w,i){
+      var slot=1/LOOSE.length;
+      var e=ease(Math.max(0,Math.min(1,(looseP-i*slot*.92)/(slot*1.5))));
+      if(w.idx)w.geo.setDrawRange(0,Math.floor(w.idx*e));
+      w.mesh.visible=e>.002;
+      w.mesh.material.opacity=1;
+      var tipOn=e>.01&&e<.99;
+      w.tip.visible=tipOn;
+      if(tipOn){w.tip.position.copy(w.curve.getPointAt(e));w.tip.material.opacity=.9;}
+      if(e>=.999)done++;
+    });
+    if(p<.70){
+      setMetrics([["Pulls complete",done+" / "+LOOSE.length],["Handling ops",(done*4),true],
+                  ["Shared corridor","none"],["Order of work","by memory"]]);
+      metrics.classList.add("on");
+    }
+  }
+
+  /* ---- act 5: harness install ---- */
+  var hp=span(p,.70,.90);
+  gHarness.visible=p>=.68;
+  if(gHarness.visible){
+    var slide=ease(span(p,.70,.78));
+    var clipP=span(p,.78,.83),branchP=span(p,.82,.90);
+    gHarness.position.set(0,(1-slide)*4.2,(1-slide)*5.0);
+    hTrunk.forEach(function(t){
+      if(t.idx)t.geo.setDrawRange(0,t.idx);
+      t.mesh.visible=true;
+      t.mesh.material.opacity=.42*Math.max(.25,slide);
+    });
+    clips.forEach(function(c,i){
+      var e=ease(Math.max(0,Math.min(1,(clipP-i*.14)/.3)));
+      c.material.opacity=e;c.scale.setScalar(.6+e*.4);
+    });
+    var plugged=0;
+    hBranch.forEach(function(b,i){
+      var e=ease(Math.max(0,Math.min(1,(branchP-i*.045)/.35)));
+      if(b.idx)b.geo.setDrawRange(0,Math.floor(b.idx*e));
+      b.mesh.visible=e>.002;
+      var tipOn=e>.01&&e<.99;
+      b.tip.visible=tipOn;
+      if(tipOn){b.tip.position.copy(b.curve.getPointAt(e));b.tip.material.opacity=.9;}
+      b.conn.material.opacity=e>=.999?.65:0;
+      if(e>=.999)plugged++;
+    });
+    if(p>=.70&&p<.90){
+      setMetrics([["Bundles placed",slide>.9?"1":"0"],["Clips set",Math.round(clipP*clips.length)+" / "+clips.length],
+                  ["Terminations",plugged+" / "+hBranch.length],
+                  ["Handling ops",Math.round(2+clipP*5+plugged),true]]);
+      metrics.classList.add("on");
+    }
+  }
+
+  /* ---- compare ---- */
+  var cmp=p>=.90;
+  compare.classList.toggle("on",cmp);
+  if(cmp){
+    setMetrics([["Left","wire by wire"],["Right","one harness"],
+                ["Pulls","16  vs  1",true],["Handling ops","64  vs  14",true],
+                ["Figures","illustrative"]]);
+    metrics.classList.add("on");
+  }
+
+  /* camera */
+  var ck=camFor(p);
+  sph.th=ck.th;sph.ph=ck.ph;sph.r=ck.r;tgt.set(0,ck.ty,0);
+  applyCam();
+
+  /* render */
+  if(cmp){
+    var w=innerWidth,h=innerHeight;
+    renderer.setViewport(0,0,w,h);
+    renderer.setScissorTest(true);
+    gLoose.visible=true;gHarness.visible=false;gRoute.visible=false;
+    LOOSE.forEach(function(w2){ if(w2.idx)w2.geo.setDrawRange(0,w2.idx); w2.mesh.visible=true; w2.tip.visible=false; });
+    renderer.setScissor(0,0,w*split,h);
+    renderer.render(scene,camera);
+    gLoose.visible=false;gHarness.visible=true;
+    renderer.setScissor(w*split,0,w*(1-split),h);
+    renderer.render(scene,camera);
+    renderer.setScissorTest(false);
+  }else{
+    renderer.setViewport(0,0,innerWidth,innerHeight);
+    renderer.render(scene,camera);
+  }
+}
+layoutShell(LA);
+applyCam();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
