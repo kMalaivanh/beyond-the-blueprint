@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import './film.css';
+import {createEngineeringObjects} from './EngineeringObjects.js';
 
 const TOTAL=1250,STAGES=7,TAU=Math.PI*2;
 const $=s=>document.querySelector(s);
@@ -9,10 +10,10 @@ const mix=(a,b,t)=>a+(b-a)*t;
 const rand=i=>{let v=Math.sin(i*127.1+78.233)*43758.5453;return v-Math.floor(v)};
 const titles=[
  ['00 / THE BEGINNING','Before anything connected.','Every design was its own universe.'],
- ['01 / FRAGMENTATION','Information everywhere.','Drawings. Circuits. Components. Measurements. Separate, but related.'],
- ['02 / THE QUESTION','A line is not a route.','A connection on paper is not yet a path through three-dimensional space.'],
- ['03 / THE ENGINEERING','Make the invisible visible.','Electrical routes grow through space, converge, and branch toward their destinations.'],
- ['04 / THE TRANSFORMATION','Stop recreating. Start connecting.','Repeated definitions converge. A shared foundation emerges. What is unique stays unique.'],
+ ['01 / FRAGMENTATION','The drawings become visible.','Individual electrical sheets emerge from the particles, revealing duplicated design work.'],
+ ['02 / THE THINKING','Observe. Measure. Model.','See the engineering decision process: understand the geometry before changing the workflow.'],
+ ['03 / THE ENGINEERING','A drawing becomes a 3D vehicle.','Follow the physical reality: components, spatial constraints, and individual wires routed through a coach.'],
+ ['04 / THE TRANSFORMATION','One backbone. Then the branches.','A growing harness replaces separate routes with a reusable architecture. The connections still serve distinct destinations.'],
  ['05 / THE SYSTEM','One foundation. Many possibilities.','Change the configuration. The relationships endure.'],
  ['06 / BEYOND THE BLUEPRINT','Different disciplines. One mindset.','Electrical engineering. Software. Data. Leadership. Always improving.']
 ];
@@ -33,6 +34,7 @@ const scene=new THREE.Scene();
 scene.fog=new THREE.FogExp2(0x070c10,.018);
 const camera=new THREE.PerspectiveCamera(52,1,.1,200);camera.position.set(0,0,34);
 const world=new THREE.Group();scene.add(world);
+const engineeringObjects=createEngineeringObjects(scene);
 const colors=[new THREE.Color('#dda77e'),new THREE.Color('#9fc7c0'),new THREE.Color('#ddd3bd'),new THREE.Color('#c9b9d2'),new THREE.Color('#8eb3c4')];
 const anchors=[[-11,5,0],[11,6,-2],[-1,-7,3]];
 const points=[];
@@ -118,6 +120,7 @@ const render=(ms)=>{
  const scaled=renderProgress*(STAGES-1),stage=Math.min(STAGES-2,Math.floor(scaled)),t=smooth(scaled-stage),i0=stage,i1=stage+1;
  const pos=geometry.attributes.position.array;
  const time=ms*.001;
+ const objectState=engineeringObjects.update(renderProgress,time,innerWidth);
  for(let i=0;i<TOTAL;i++){const j=i*3;pos[j]=mix(targets[i0][j],targets[i1][j],t);pos[j+1]=mix(targets[i0][j+1],targets[i1][j+1],t);pos[j+2]=mix(targets[i0][j+2],targets[i1][j+2],t)}
  geometry.attributes.position.needsUpdate=true;
  // Flow across coherent structures rather than random noise.
@@ -137,6 +140,10 @@ const render=(ms)=>{
  camera.position.z=mix(camera.position.z,innerWidth<720?46:32-(Math.sin(renderProgress*Math.PI)*3),.025);
  camera.position.x=mix(camera.position.x,Math.sin(renderProgress*TAU)*2,.018);camera.lookAt(0,0,0);
  material.uniforms.uTime.value=time;
+ const objectFocus=Math.max(objectState.drawingOpacity*.92,objectState.rigOpacity*.82);
+ material.uniforms.uOpacity.value=1-objectFocus*.88;
+ tracer.material.opacity=.75*(1-objectFocus*.83);
+ lines.material.opacity*=1-objectFocus*.75;
  const chapter=Math.min(6,Math.floor(renderProgress*6.999));
  if(chapter!==currentStage){currentStage=chapter;const story=titles[chapter];$('#film-kicker').textContent=story[0];$('#film-title').textContent=story[1];$('#film-description').textContent=story[2];$('#film-count').textContent=String(chapter+1).padStart(2,'0')+' — 07';caption.classList.remove('caption-flash');void caption.offsetHeight;caption.classList.add('caption-flash')}
  intro.style.opacity=String(1-smooth(renderProgress/.13));
