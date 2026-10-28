@@ -49,18 +49,23 @@ for(let i=0;i<TOTAL;i++){
  const k=i*3;
  // Opening: isolated star field with distant clusters
  targets[0].set([bx*1.38,by*1.32,bz*1.4],k);
- // Repeated engineering drawings: three isolated swarms of sheet-like arrays
- const item=Math.floor(i/3),column=item%18,row=Math.floor(item/18)%24;
- targets[1].set([cl[0]+(column-9)*.66,cl[1]+(row-11)*.52,cl[2]+Math.sin(column*.5)*1.8],k);
- // Flat electrical schematic: horizontal orthogonal line connections
- const line=Math.floor(i/120),idx=i%120,x=-15+(idx/119)*30,y=(line-5)*1.8;
- targets[2].set([x,y+(idx%3===0?1.4:0),Math.sin(line*2)*.08],k);
- // 3D harness — trunk and branches with organic interpolation
- const strand=i%17,along=Math.floor(i/17)/Math.ceil(TOTAL/17),x3=-14+along*28;
- let hy=0,hz=0;
- if(strand<5){hy=(strand-2)*.17;hz=(strand-2)*.26}
- else{const branch=Math.floor((strand-5)/2),start=-10+branch*4.1,dist=clamp((x3-start)/2.8);hy=Math.sin(dist*Math.PI*.5)*(2.1+branch*.6)*(strand%2===0?1:-1);hz=dist*(branch%2===0?3:-3)}
- targets[3].set([x3,hy,hz],k);
+ // Three drawing sheets appear: particles assemble across recognizable paper planes.
+ const sheet=i%9,cell=Math.floor(i/9),column=cell%14,row=Math.floor(cell/14)%10;
+ const sx=(sheet%3-1)*7,sy=(1-Math.floor(sheet/3))*5;
+ targets[1].set([sx+(column-6.5)*.42,sy+(row-4.5)*.36,(sheet%3-1)*.42],k);
+ // The same particles condense into orthogonal circuit tracks and diagram components.
+ const line=Math.floor(i/125),idx=i%125,x=-12+(idx/124)*24,y=(line-5)*1.05;
+ const bend=idx>60&&idx<82?2.4:idx>=82?1.15:0;
+ targets[2].set([x,y+bend,(line%2)*.08],k);
+ // An actual 3D trailer silhouette assembles: edges, bulkheads and a central conduit.
+ const edge=i%16,step=Math.floor(i/16)/Math.ceil(TOTAL/16);
+ const u=-11.5+23*step;
+ let vx=u,vy=0,vz=0;
+ if(edge<4){vy=edge%2?3.6:-3.6;vz=edge<2?-3.5:3.5}
+ else if(edge<8){vx=edge%2?11.5:-11.5;vy=-3.6+7.2*step;vz=edge<6?-3.5:3.5}
+ else if(edge<12){vx=edge%2?11.5:-11.5;vy=edge<10?-3.6:3.6;vz=-3.5+7*step}
+ else {vy=-2.5+(edge-13.5)*.12;vz=-3.2+(edge%2)*.2}
+ targets[3].set([vx,vy,vz],k);
  // Consolidation: common definitions converge into fewer reusable nodes; others orbit
  const shared=i%9!==0,def=i%18,a=(def/18)*TAU;
  const cx=Math.cos(a)*5.8,cy=Math.sin(a)*4.8,cz=Math.sin(a*2)*2.5;
