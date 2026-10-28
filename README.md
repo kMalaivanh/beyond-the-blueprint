@@ -2,6 +2,13 @@
 
 An immersive portfolio for Kailia Malaivanh, built around engineering better systems.
 
+## New interactive storytelling
+
+- **Fragmentation to Connection**: scroll-driven narrative where 96 illustrative engineering artifacts converge into shared definition nodes, preserving model-specific variation.
+- **Explore the architecture**: switch between three model layouts, add or remove a branch circuit, select highlighted nodes, and scrub the consolidation timeline.
+- **Engineering economics**: adjust production volume, assumed labor rates and setup costs to explore when a harness approach may or may not break even. All scenario inputs are synthetic, not employer data.
+- **3D Drawings to Harness**: separate WebGL scene at `/harness.html`, using the supplied demonstration.
+
 ## Experience
 
 - Cinematic editorial homepage with kinetic hero, scroll reveals, animated technical scenes and interactive project navigation.
