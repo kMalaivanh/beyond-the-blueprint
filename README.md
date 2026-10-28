@@ -1,45 +1,44 @@
-# Beyond the Blueprint
+# Beyond the Blueprint — Particle Film
 
-An immersive portfolio for Kailia Malaivanh, built around engineering better systems.
+A cinematic, scroll-directed engineering portfolio for Kailia Malaivanh.
 
-## New interactive storytelling
+## Current homepage
 
-- **Fragmentation to Connection**: scroll-driven narrative where 96 illustrative engineering artifacts converge into shared definition nodes, preserving model-specific variation.
-- **Explore the architecture**: switch between three model layouts, add or remove a branch circuit, select highlighted nodes, and scrub the consolidation timeline.
-- **Engineering economics**: adjust production volume, assumed labor rates and setup costs to explore when a harness approach may or may not break even. All scenario inputs are synthetic, not employer data.
-- **3D Drawings to Harness**: separate WebGL scene at `/harness.html`, using the supplied demonstration.
+The homepage is now a **single continuous WebGL particle animation**, not a collection of project cards. Scroll drives a seven-beat animation timeline:
 
-## Experience
+1. A universe of disconnected engineering information
+2. Three groups of independently maintained artifacts
+3. Flattened electrical schematic
+4. Three-dimensional routing and branching
+5. Shared engineering definitions and consolidation
+6. Reusable architecture
+7. Connected systems across disciplines
 
-- Cinematic editorial homepage with kinetic hero, scroll reveals, animated technical scenes and interactive project navigation.
-- Electrical engineering case study at **/harness.html**: 2D drawings, 3D RV wire routing, model-length morph, cable growth, manual-vs-harness installation and draggable before/after comparison.
-- Software automation, data analytics, product design, and leadership chapters.
+The film uses **1,250 individually animated particles**, 150 flowing tracer particles, supporting connection segments, a layered star field, camera orbit, and cinematic narrative captions. The mouse adds gentle parallax. A 3D harness demonstration is still available at `/harness.html`, and GGWordle / GitHub project links appear at the end.
 
-The 3D visualization is an illustrative reconstruction using generic vehicle geometry and fictional components, not confidential manufacturer CAD data. Figures in that animation are illustrative and should not be treated as recorded production measurements.
+### Technical architecture
 
-## Run
+- `film.js`: current Three.js animation engine and scroll timeline
+- `film.css`: editorial film styling, mobile layout and caption transitions
+- `index.html`: entry point
+- `public/harness.html`: existing interactive RV harness case study
+- Earlier experimental React components remain in the repo as references but are **not** used by the current homepage.
+
+### Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Build
+### Production / Vercel
 
 ```bash
 npm run build
 ```
 
-## Deploy
+Use Vite as the framework preset and `dist` as the build output directory.
 
-Import this repository into Vercel as **Vite**, build command `npm run build`, output folder `dist`. With a linked Vercel project, updates to `main` usually trigger a new deployment automatically.
+### Notes
 
-## Project structure
-
-- `editorial.jsx` + `editorial.css` — current homepage
-- `public/harness.html` — full 3D scroll experience (served at `/harness.html`)
-- `src.jsx` + `SystemsLab.jsx` — earlier prototype kept as reference, not loaded by the homepage
-
-## Next
-
-Production QA across devices, technical project detail pages, performance optimization, and accessibility testing.
+All shapes and routes are synthetic storytelling representations. They do not reproduce confidential employer drawings, manufacturing data or specifications. This is an interactive browser-rendered particle film, **not a pre-rendered video**. The scrolling timeline is the playback control. Production build and browser/GPU QA should be completed before public release.
